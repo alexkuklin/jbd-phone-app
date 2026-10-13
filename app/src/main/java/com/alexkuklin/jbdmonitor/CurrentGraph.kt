@@ -45,7 +45,7 @@ fun CurrentGraph(history: List<Sample>, modifier: Modifier = Modifier) {
         }
 
         val now = history.last().tMs
-        val span = (now - history.first().tMs).coerceIn(60_000L, MonitorViewModel.HISTORY_WINDOW_MS)
+        val span = (now - history.first().tMs).coerceIn(60_000L, Monitor.HISTORY_WINDOW_MS)
         val t0 = now - span
         val peak = max(5f, history.maxOf { abs(it.amps) })
         val yMax = yScales.firstOrNull { it >= peak } ?: peak

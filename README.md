@@ -11,6 +11,7 @@ Android app (Kotlin + Jetpack Compose) that reads a JBD / Xiaoxiang BMS over Blu
 - current graph for the last up to 30 minutes since connecting
 
 Protocol: GATT service `FF00`, notify `FF01`, write `FF02`; polls command `0x03` (basic info) and `0x04` (cell voltages) about once a second.
+While connected, a foreground service keeps the app running in the background and shows a status notification (SoC, current, power) with a Disconnect button.
 The BMS accepts only one BLE connection, so close other JBD apps first.
 
 ## Build

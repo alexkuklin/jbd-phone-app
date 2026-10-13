@@ -80,6 +80,10 @@ private fun requiredPermissions(): Array<String> =
     if (Build.VERSION.SDK_INT >= 31) arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
     else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
 
+/** Notification permission is requested too, but the app works without it (only the status notification is hidden). */
+private fun requestedPermissions(): Array<String> =
+    if (Build.VERSION.SDK_INT >= 33) requiredPermissions() + Manifest.permission.POST_NOTIFICATIONS else requiredPermissions()
+
 private fun hasAll(ctx: Context, perms: Array<String>) =
     perms.all { ContextCompat.checkSelfPermission(ctx, it) == PackageManager.PERMISSION_GRANTED }
 
@@ -90,7 +94,7 @@ private fun App(vm: MonitorViewModel) {
     val perms = remember { requiredPermissions() }
     var granted by remember { mutableStateOf(hasAll(ctx, perms)) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        granted = it.values.all { ok -> ok }
+        granted = hasAll(ctx, perms)
     }
     LaunchedEffect(granted) { if (granted) vm.autoConnect() }
 
@@ -98,7 +102,7 @@ private fun App(vm: MonitorViewModel) {
         !granted -> CenteredColumn {
             Text("Bluetooth permission is needed to talk to the battery.")
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { launcher.launch(perms) }) { Text("Grant permission") }
+            Button(onClick = { launcher.launch(requestedPermissions()) }) { Text("Grant permission") }
         }
         ui.conn == ConnState.Connected || (ui.conn == ConnState.Connecting && ui.info != null) -> Dashboard(ui, vm)
         else -> ScanScreen(ui, vm)
