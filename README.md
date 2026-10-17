@@ -6,8 +6,9 @@ Android app (Kotlin + Jetpack Compose) that reads a JBD / Xiaoxiang BMS over Blu
 - pack voltage, individual cell voltages, min/max and cell delta, balancing indicators
 - power (V × I)
 - temperature sensors reported by the BMS
-- reported SoC and remaining/nominal Ah
+- reported SoC (inside the gauge, with voltage and power) and remaining/nominal Ah
 - projected time to full (charging) or empty (discharging), from a ~30 s smoothed current
+- alerts (notification + in-app banner) for low SoC and cell imbalance; thresholds are adjustable in the app
 - current graph for the last up to 30 minutes since connecting
 
 Protocol: GATT service `FF00`, notify `FF01`, write `FF02`; polls command `0x03` (basic info) and `0x04` (cell voltages) about once a second.

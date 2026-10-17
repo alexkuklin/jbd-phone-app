@@ -29,6 +29,8 @@ data class UiState(
     val smoothedAmps: Float = 0f,
     val history: List<Sample> = emptyList(),
     val message: String? = null,
+    val settings: AlertSettings = AlertSettings(),
+    val alerts: Set<Alert> = emptySet(),
 )
 
 /** Process-wide owner of the BLE connection, so it survives the UI and runs under [MonitorService]. */
@@ -47,9 +49,11 @@ class Monitor private constructor(private val app: Context) : BleClient.Listener
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val prefs = app.getSharedPreferences("jbd", Context.MODE_PRIVATE)
     private val client = BleClient(app, this)
-    private val _ui = MutableStateFlow(UiState())
+    private val _ui = MutableStateFlow(UiState(settings = loadSettings()))
     val ui: StateFlow<UiState> = _ui.asStateFlow()
 
+    private val alertEngine = AlertEngine()
+    private val notifier = AlertNotifier(app)
     private val found = LinkedHashMap<String, Device>()
     private val history = ArrayList<Sample>()
     private var assembler = FrameAssembler()
@@ -91,7 +95,8 @@ class Monitor private constructor(private val app: Context) : BleClient.Listener
         stopScan()
         wantAddress = device.address
         prefs.edit().putString("addr", device.address).putString("name", device.name).apply()
-        _ui.update { UiState(conn = ConnState.Connecting, deviceName = device.name ?: device.address) }
+        _ui.update { UiState(conn = ConnState.Connecting, deviceName = device.name ?: device.address, settings = it.settings) }
+        alertEngine.reset()
         ContextCompat.startForegroundService(app, Intent(app, MonitorService::class.java))
         client.connect(device.address)
     }
@@ -103,7 +108,36 @@ class Monitor private constructor(private val app: Context) : BleClient.Listener
         client.close()
         prefs.edit().remove("addr").remove("name").apply()
         history.clear()
-        _ui.value = UiState()
+        alertEngine.reset()
+        Alert.entries.forEach(notifier::clear)
+        _ui.update { UiState(settings = it.settings) }
+    }
+
+    fun updateSettings(settings: AlertSettings) {
+        prefs.edit()
+            .putBoolean("lowSocOn", settings.lowSocEnabled).putInt("lowSoc", settings.lowSocPercent)
+            .putBoolean("imbOn", settings.imbalanceEnabled).putInt("imbMv", settings.imbalanceMv)
+            .apply()
+        _ui.update { it.copy(settings = settings) }
+        evaluateAlerts()
+    }
+
+    private fun loadSettings(): AlertSettings {
+        val d = AlertSettings()
+        return AlertSettings(
+            prefs.getBoolean("lowSocOn", d.lowSocEnabled), prefs.getInt("lowSoc", d.lowSocPercent),
+            prefs.getBoolean("imbOn", d.imbalanceEnabled), prefs.getInt("imbMv", d.imbalanceMv),
+        )
+    }
+
+    private fun evaluateAlerts() {
+        val s = _ui.value
+        val active = alertEngine.update(s.settings, s.info?.soc, cellDeltaMv(s.cells))
+        if (active == s.alerts) return
+        _ui.update { it.copy(alerts = active) }
+        val now = _ui.value
+        (active - s.alerts).forEach { notifier.fire(it, alertText(it, now)) }
+        (s.alerts - active).forEach(notifier::clear)
     }
 
     // --- BleClient.Listener (called on binder threads, hop to main) ---
@@ -173,7 +207,10 @@ class Monitor private constructor(private val app: Context) : BleClient.Listener
                 if (f.status != 0) continue
                 when (f.cmd) {
                     JbdProtocol.CMD_BASIC -> JbdProtocol.parseBasic(f.data)?.let(::onBasic)
-                    JbdProtocol.CMD_CELLS -> _ui.update { it.copy(cells = JbdProtocol.parseCells(f.data)) }
+                    JbdProtocol.CMD_CELLS -> {
+                        _ui.update { it.copy(cells = JbdProtocol.parseCells(f.data)) }
+                        evaluateAlerts()
+                    }
                 }
             }
         }
@@ -191,5 +228,6 @@ class Monitor private constructor(private val app: Context) : BleClient.Listener
         val stale = history.indexOfFirst { it.tMs >= cutoff }.let { if (it < 0) history.size else it }
         if (stale > 0) history.subList(0, stale).clear()
         _ui.update { it.copy(info = info, smoothedAmps = smoothed, history = history.toList()) }
+        evaluateAlerts()
     }
 }

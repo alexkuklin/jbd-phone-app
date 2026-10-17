@@ -78,3 +78,38 @@ class JbdProtocolTest {
         assertEquals(null, estimateEta(info, 0.1f))
     }
 }
+
+class AlertEngineTest {
+    private val s = AlertSettings(lowSocPercent = 20, imbalanceMv = 100)
+
+    @Test
+    fun lowSocLatchesWithHysteresis() {
+        val e = AlertEngine()
+        assertEquals(emptySet<Alert>(), e.update(s, 21, 0))
+        assertEquals(setOf(Alert.LowSoc), e.update(s, 20, 0))
+        assertEquals(setOf(Alert.LowSoc), e.update(s, 22, 0)) // still latched
+        assertEquals(emptySet<Alert>(), e.update(s, 23, 0))
+    }
+
+    @Test
+    fun imbalanceLatchesWithHysteresis() {
+        val e = AlertEngine()
+        assertEquals(emptySet<Alert>(), e.update(s, 90, 99))
+        assertEquals(setOf(Alert.Imbalance), e.update(s, 90, 100))
+        assertEquals(setOf(Alert.Imbalance), e.update(s, 90, 85))
+        assertEquals(emptySet<Alert>(), e.update(s, 90, 79))
+    }
+
+    @Test
+    fun disabledAlertsNeverFire() {
+        val e = AlertEngine()
+        val off = s.copy(lowSocEnabled = false, imbalanceEnabled = false)
+        assertEquals(emptySet<Alert>(), e.update(off, 1, 500))
+    }
+
+    @Test
+    fun cellDelta() {
+        assertEquals(15, cellDeltaMv(listOf(3.300f, 3.315f, 3.310f)))
+        assertEquals(null, cellDeltaMv(listOf(3.3f)))
+    }
+}

@@ -39,6 +39,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -194,20 +195,34 @@ private fun Dashboard(ui: UiState, vm: MonitorViewModel) {
             OutlinedButton(onClick = vm::disconnect) { Text("Disconnect") }
         }
 
+        if (ui.alerts.isNotEmpty()) {
+            Card(
+                Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    ui.alerts.forEach { Text("⚠ " + alertText(it, ui), fontWeight = FontWeight.Bold) }
+                }
+            }
+        }
+
         Section("Current") {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CurrentGauge(info.current) }
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CurrentGauge(info.current, info.packVoltage, info.powerW, info.soc) }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Section("State of charge", Modifier.weight(1f)) {
-                Text("${info.soc} %", style = MaterialTheme.typography.headlineMedium)
+            Section("Capacity", Modifier.weight(1f)) {
+                Text(
+                    String.format(Locale.US, "%.1f Ah", info.remainingAh),
+                    style = MaterialTheme.typography.headlineMedium,
+                )
                 LinearProgressIndicator(progress = { info.soc / 100f }, Modifier.fillMaxWidth())
                 if (info.nominalAh > 0f) {
                     Spacer(Modifier.height(4.dp))
-                    Text(
-                        String.format(Locale.US, "%.1f / %.1f Ah", info.remainingAh, info.nominalAh),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    Text(String.format(Locale.US, "of %.1f Ah", info.nominalAh), style = MaterialTheme.typography.bodySmall)
                 }
             }
             val eta = estimateEta(info, ui.smoothedAmps)
@@ -217,15 +232,6 @@ private fun Dashboard(ui: UiState, vm: MonitorViewModel) {
                     if (eta == null) "idle" else "at ${String.format(Locale.US, "%.1f", kotlin.math.abs(ui.smoothedAmps))} A avg",
                     style = MaterialTheme.typography.bodySmall,
                 )
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Section("Voltage", Modifier.weight(1f)) {
-                Text(String.format(Locale.US, "%.2f V", info.packVoltage), style = MaterialTheme.typography.headlineMedium)
-            }
-            Section("Power", Modifier.weight(1f)) {
-                Text(String.format(Locale.US, "%+.0f W", info.powerW), style = MaterialTheme.typography.headlineMedium)
             }
         }
 
@@ -246,6 +252,8 @@ private fun Dashboard(ui: UiState, vm: MonitorViewModel) {
         Section("Current history (up to 30 min)") {
             CurrentGraph(ui.history)
         }
+
+        AlertSettingsSection(ui.settings, vm::updateSettings)
 
         Section("Status") {
             Text(
@@ -303,5 +311,36 @@ private fun CellsSection(cells: List<Float>, balanceMask: Long) {
             Spacer(Modifier.height(4.dp))
             Text("● balancing", style = MaterialTheme.typography.bodySmall, color = Color(0xFF42A5F5))
         }
+    }
+}
+
+@Composable
+private fun AlertSettingsSection(s: AlertSettings, onChange: (AlertSettings) -> Unit) {
+    Section("Alerts") {
+        AlertRow(
+            "Low charge at or below", s.lowSocEnabled, "${s.lowSocPercent} %",
+            onToggle = { onChange(s.copy(lowSocEnabled = it)) },
+            onStep = { onChange(s.copy(lowSocPercent = (s.lowSocPercent + it * 5).coerceIn(5, 50))) },
+        )
+        AlertRow(
+            "Cell imbalance at or above", s.imbalanceEnabled, "${s.imbalanceMv} mV",
+            onToggle = { onChange(s.copy(imbalanceEnabled = it)) },
+            onStep = { onChange(s.copy(imbalanceMv = (s.imbalanceMv + it * 10).coerceIn(10, 500))) },
+        )
+    }
+}
+
+@Composable
+private fun AlertRow(label: String, enabled: Boolean, value: String, onToggle: (Boolean) -> Unit, onStep: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Switch(enabled, onToggle)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodySmall)
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+        OutlinedButton(onClick = { onStep(-1) }, enabled = enabled) { Text("−") }
+        Spacer(Modifier.width(8.dp))
+        OutlinedButton(onClick = { onStep(1) }, enabled = enabled) { Text("+") }
     }
 }

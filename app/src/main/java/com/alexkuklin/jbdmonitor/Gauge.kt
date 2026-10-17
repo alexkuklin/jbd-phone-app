@@ -1,7 +1,11 @@
 package com.alexkuklin.jbdmonitor
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -50,7 +55,7 @@ private val ticks = listOf(1, 2, 5, 10, 20, 50, 100, 200)
  * discharge sweeping left (orange), charge sweeping right (green).
  */
 @Composable
-fun CurrentGauge(amps: Float, modifier: Modifier = Modifier) {
+fun CurrentGauge(amps: Float, volts: Float, watts: Float, soc: Int, modifier: Modifier = Modifier) {
     val measurer = rememberTextMeasurer()
     val track = MaterialTheme.colorScheme.surfaceVariant
     val tickColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -101,10 +106,11 @@ fun CurrentGauge(amps: Float, modifier: Modifier = Modifier) {
                 }
             }
         }
-        Column(Modifier.padding(top = 36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.padding(top = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 String.format(Locale.US, "%+.2f", amps),
-                style = MaterialTheme.typography.displayMedium,
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center,
             )
             Text(
@@ -116,6 +122,18 @@ fun CurrentGauge(amps: Float, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                GaugeStat(String.format(Locale.US, "%.2f V", volts), "voltage")
+                GaugeStat(String.format(Locale.US, "%+.0f W", watts), "power")
+                GaugeStat("$soc %", "charge")
+            }
         }
     }
+}
+
+@Composable
+private fun GaugeStat(value: String, label: String) = Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
