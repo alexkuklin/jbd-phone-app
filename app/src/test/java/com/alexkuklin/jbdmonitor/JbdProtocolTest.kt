@@ -54,6 +54,19 @@ class JbdProtocolTest {
     }
 
     @Test
+    fun handles8sPackThroughChunkedFrames() {
+        val mv = intArrayOf(3301, 3302, 3299, 3305, 3300, 3298, 3304, 3303)
+        val basic = basicPayload().also { it[21] = 8 }
+        val stream = frame(3, basic) + frame(4, u16(*mv))
+        val asm = FrameAssembler()
+        val out = stream.toList().chunked(20).flatMap { asm.feed(it.toByteArray()) }
+        assertEquals(8, JbdProtocol.parseBasic(out[0].data)!!.cellCount)
+        val cells = JbdProtocol.parseCells(out[1].data)
+        assertEquals(8, cells.size)
+        assertEquals(7, cellDeltaMv(cells))
+    }
+
+    @Test
     fun rejectsBadChecksum() {
         val a = frame(4, u16(3300, 3301))
         a[5] = (a[5] + 1).toByte()
