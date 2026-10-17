@@ -15,6 +15,17 @@ Protocol: GATT service `FF00`, notify `FF01`, write `FF02`; polls command `0x03`
 While connected, a foreground service keeps the app running in the background and shows a status notification (SoC, current, power) with a Disconnect button.
 The BMS accepts only one BLE connection, so close other JBD apps first.
 
+## Screenshots
+
+<p>
+  <img src="docs/screenshots/dashboard.png" width="260" alt="Dashboard: logarithmic current gauge with voltage, power and SoC in the centre, capacity, time to empty and cell voltages">
+  <img src="docs/screenshots/cells-graph-alerts.png" width="260" alt="Cell voltages with min/max highlighted, temperature sensor, 30-minute current graph, alert settings and status">
+  <img src="docs/screenshots/notification.png" width="260" alt="Foreground-service notification showing SoC, current and power">
+</p>
+
+Left: current gauge (log scale, ±200 A), capacity, time to empty and cells. Middle: cell delta, temperature, current history and alert thresholds.
+Right: the status notification that keeps the connection alive in the background.
+
 ## Build
 
 ```sh
